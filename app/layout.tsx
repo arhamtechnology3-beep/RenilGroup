@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WhatsAppFloater } from "@/components/layout/whatsapp-floater";
 import { ContactSticky } from "@/components/layout/contact-sticky";
+import { DisableContextMenu } from "@/components/layout/disable-context-menu";
+import ScrollProgressBar from "@/components/ui/scroll-progress-bar";
 import { JsonLd, organizationJsonLd } from "@/components/ui/json-ld";
 import { defaultSeo } from "@/content/seo";
 
@@ -69,11 +72,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${jakarta.variable}`}>
+    <html
+      lang="en"
+      className={`${cormorant.variable} ${jakarta.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <JsonLd data={organizationJsonLd} />
+        <Script
+          id="disable-context-menu"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html:
+              "document.addEventListener('contextmenu',function(e){e.preventDefault();e.stopPropagation();},true);",
+          }}
+        />
       </head>
       <body className="min-h-screen flex flex-col bg-[#f8f5ee] text-[#22201d] antialiased selection:bg-[#a98345]/20 selection:text-[#22201d]">
+        <DisableContextMenu />
+        <ScrollProgressBar type="bar" color="#a98345" strokeSize={3} />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />

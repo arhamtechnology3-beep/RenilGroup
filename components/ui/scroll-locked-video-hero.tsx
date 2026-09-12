@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
-import { ChevronDown, Play, Pause, Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 
 interface ScrollLockedVideoHeroProps {
   videoSrc?: string;
@@ -27,14 +26,16 @@ function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max);
 }
 
+function isFiniteDuration(d: number) {
+  return Number.isFinite(d) && d > 0;
+}
+
 export function ScrollLockedVideoHero({
   videoSrc = "/video/renil-hero.mp4",
   posterSrc = "/images/hero-arch-wall.png",
   eyebrow = "RENIL GROUPS • WE GROW TOGETHER",
   title = "Building businesses. Creating value.",
   subtitle = "A growing business group with an entrepreneurial mindset — bringing together investment opportunities, development, hospitality and logistics under one vision.",
-  revealedTitle = "From Vision To Execution.",
-  revealedSubtitle = "Four complementary verticals engineered for generational value creation and sustainable enterprise scale.",
   scrollHint = "SCROLL TO EXPLORE",
   primaryCtaText = "Present Your Business",
   primaryCtaHref = "/submit-your-business",
@@ -50,120 +51,195 @@ export function ScrollLockedVideoHero({
   const revealedContentRef = React.useRef<HTMLDivElement>(null);
   const scrollHintRef = React.useRef<HTMLDivElement>(null);
 
-  const [isVideoLoaded, setIsVideoLoaded] = React.useState(false);
-  const [isPlaying, setIsPlaying] = React.useState(false);
-  const [hasScrolled, setHasScrolled] = React.useState(false);
+  const [isVideoReady, setIsVideoReady] = React.useState(false);
 
-  // Target and current progress values for ultra-smooth lerp
   const targetProgress = React.useRef(0);
   const currentProgress = React.useRef(0);
   const videoDuration = React.useRef(0);
-  const isSeeking = React.useRef(false);
   const pendingSeek = React.useRef<number | null>(null);
+  const lastSeekAt = React.useRef(0);
+  const scrollRange = React.useRef(1);
+  const reducedMotion = React.useRef(false);
 
-  // Video loaded setup
+  const measureScrollRange = React.useCallback(() => {
+    const container = containerRef.current;
+    const sticky = stickyRef.current;
+    if (!container || !sticky) return;
+    // Use sticky pane height (svh-stable) — not window.innerHeight, which jumps on
+    // mobile URL-bar show/hide and made scrub progress intermittent.
+    const range = Math.max(1, container.offsetHeight - sticky.clientHeight);
+    scrollRange.current = range;
+  }, []);
+
+  const readProgress = React.useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    measureScrollRange();
+    const rect = container.getBoundingClientRect();
+    const progress = clamp(-rect.top / scrollRange.current, 0, 1);
+    targetProgress.current = progress;
+  }, [measureScrollRange]);
+
+  const syncVideoDuration = React.useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isFiniteDuration(video.duration)) {
+      videoDuration.current = video.duration;
+      setIsVideoReady(true);
+      try {
+        video.pause();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  // Video metadata — mobile Safari often fires before listeners attach, or
+  // reports duration late. Cover multiple events + readyState.
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const onLoadedData = () => {
-      videoDuration.current = video.duration || 0;
-      setIsVideoLoaded(true);
-      // Ensure video is paused so scroll exclusively controls the playback time
-      try {
-        video.pause();
-      } catch {}
-    };
+    reducedMotion.current = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
-    video.addEventListener("loadeddata", onLoadedData);
+    const onMeta = () => syncVideoDuration();
+    video.addEventListener("loadedmetadata", onMeta);
+    video.addEventListener("durationchange", onMeta);
+    video.addEventListener("loadeddata", onMeta);
+    video.addEventListener("canplay", onMeta);
 
-    return () => {
-      video.removeEventListener("loadeddata", onLoadedData);
-    };
-  }, []);
+    if (video.readyState >= 1) syncVideoDuration();
 
-  // Native scroll tracking within the locked container
-  React.useEffect(() => {
-    const handleScroll = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const scrollDist = containerRef.current.offsetHeight - window.innerHeight;
-      if (scrollDist <= 0) return;
+    // Kick decode on iOS after a user-gesture-free muted load
+    try {
+      video.load();
+    } catch {
+      /* ignore */
+    }
 
-      const progress = clamp(-rect.top / scrollDist, 0, 1);
-      targetProgress.current = progress;
-
-      if (progress > 0.01) {
-        setHasScrolled(true);
+    const onSeeked = () => {
+      const next = pendingSeek.current;
+      const v = videoRef.current;
+      if (next == null || !v || !isFiniteDuration(videoDuration.current)) return;
+      pendingSeek.current = null;
+      if (Math.abs(v.currentTime - next) > 0.04) {
+        try {
+          v.currentTime = next;
+        } catch {
+          /* ignore */
+        }
       }
     };
+    video.addEventListener("seeked", onSeeked);
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    return () => {
+      video.removeEventListener("loadedmetadata", onMeta);
+      video.removeEventListener("durationchange", onMeta);
+      video.removeEventListener("loadeddata", onMeta);
+      video.removeEventListener("canplay", onMeta);
+      video.removeEventListener("seeked", onSeeked);
+    };
+  }, [syncVideoDuration]);
 
-  // Smooth lerp frame loop (Hardware-accelerated, zero-flicker)
+  // Scroll + viewport listeners
   React.useEffect(() => {
-    let animId: number;
+    readProgress();
+    const onScroll = () => readProgress();
+    const onResize = () => {
+      measureScrollRange();
+      readProgress();
+    };
 
-    const updateFrame = () => {
-      // Lerp progress smoothly
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("orientationchange", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+    };
+  }, [measureScrollRange, readProgress]);
+
+  // RAF lerp + scrub
+  React.useEffect(() => {
+    let animId = 0;
+    const isCoarse =
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: coarse)").matches;
+
+    const updateFrame = (now: number) => {
+      const lerp = reducedMotion.current ? 1 : isCoarse ? 0.22 : 0.15;
       currentProgress.current +=
-        (targetProgress.current - currentProgress.current) * 0.15;
+        (targetProgress.current - currentProgress.current) * lerp;
       const p = currentProgress.current;
 
-      // Video scrub synchronization (Instant seek without frame flashing)
       const video = videoRef.current;
-      if (video && videoDuration.current > 0) {
-        const targetTime = p * videoDuration.current;
-        if (!video.seeking && Math.abs(video.currentTime - targetTime) > 0.03) {
-          const v = video as HTMLVideoElement & { fastSeek?: (time: number) => void };
-          if (typeof v.fastSeek === "function") {
+      const duration = videoDuration.current;
+
+      if (
+        video &&
+        isFiniteDuration(duration) &&
+        !reducedMotion.current
+      ) {
+        const targetTime = p * duration;
+        const minDelta = isCoarse ? 0.08 : 0.03;
+        const minInterval = isCoarse ? 50 : 16;
+
+        if (Math.abs(video.currentTime - targetTime) > minDelta) {
+          if (video.seeking) {
+            pendingSeek.current = targetTime;
+          } else if (now - lastSeekAt.current >= minInterval) {
+            lastSeekAt.current = now;
+            pendingSeek.current = null;
             try {
-              v.fastSeek(targetTime);
+              const v = video as HTMLVideoElement & {
+                fastSeek?: (t: number) => void;
+              };
+              if (typeof v.fastSeek === "function") v.fastSeek(targetTime);
+              else video.currentTime = targetTime;
             } catch {
-              video.currentTime = targetTime;
+              pendingSeek.current = targetTime;
             }
           } else {
-            video.currentTime = targetTime;
+            pendingSeek.current = targetTime;
           }
         }
 
-        // Scale transform from 1.0 to 1.08 with hardware compositing
-        const scale = 1 + p * 0.08;
+        const scale = 1 + p * (isCoarse ? 0.05 : 0.08);
         video.style.transform = `scale3d(${scale}, ${scale}, 1)`;
       }
 
-      // Initial intro text fade out as user scrolls (GPU translate3d + opacity, zero blur flicker)
       if (introContentRef.current) {
-        const introOpacity = 1 - clamp((p - 0.04) / 0.36, 0, 1);
+        const introOpacity = 1 - clamp((p - 0.03) / 0.32, 0, 1);
         introContentRef.current.style.opacity = String(introOpacity);
         introContentRef.current.style.transform = `translate3d(0, ${
-          (1 - introOpacity) * -20
+          (1 - introOpacity) * -16
         }px, 0)`;
         introContentRef.current.style.pointerEvents =
-          introOpacity < 0.1 ? "none" : "auto";
+          introOpacity < 0.12 ? "none" : "auto";
       }
 
-      // Scroll hint visibility
       if (scrollHintRef.current) {
-        const hintOpacity = clamp(1 - p * 3.5, 0, 1);
-        scrollHintRef.current.style.opacity = String(hintOpacity);
+        scrollHintRef.current.style.opacity = String(
+          clamp(1 - p * 4, 0, 1),
+        );
       }
 
-      // Secondary climax reveal text fade in (GPU translate3d + opacity, zero blur flicker)
       if (revealedContentRef.current) {
-        const revealOpacity = clamp((p - 0.46) / 0.30, 0, 1);
+        const revealOpacity = clamp((p - 0.42) / 0.28, 0, 1);
         revealedContentRef.current.style.opacity = String(revealOpacity);
         revealedContentRef.current.style.transform = `translate3d(0, ${
-          (1 - revealOpacity) * 14
+          (1 - revealOpacity) * 12
         }px, 0)`;
         revealedContentRef.current.style.pointerEvents =
           revealOpacity < 0.2 ? "none" : "auto";
       }
 
-      // Bottom progress bar
       if (progressBarRef.current) {
         progressBarRef.current.style.transform = `scaleX(${p})`;
       }
@@ -179,11 +255,12 @@ export function ScrollLockedVideoHero({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-[170vh] sm:h-[190vh] lg:h-[230vh] bg-[#161513]",
-        className
+        // Extra scroll room for scrub; shorter on small phones
+        "relative w-full bg-[#161513]",
+        "h-[155svh] min-[400px]:h-[165svh] sm:h-[185svh] lg:h-[220svh]",
+        className,
       )}
     >
-      {/* Sticky Fullscreen Locked Viewport with dynamic 100dvh */}
       <div
         ref={stickyRef}
         style={{
@@ -191,56 +268,54 @@ export function ScrollLockedVideoHero({
           backfaceVisibility: "hidden",
           WebkitBackfaceVisibility: "hidden",
         }}
-        className="sticky top-0 h-[100dvh] w-full overflow-hidden flex items-center justify-center"
+        // svh keeps sticky height stable when mobile browser chrome shows/hides
+        className="sticky top-0 flex h-[100svh] w-full items-center justify-center overflow-hidden"
       >
-        {/* Poster Image while Video Loads */}
         <Image
           src={posterSrc}
           alt="Renil Groups Visual Poster"
           fill
           priority
+          sizes="100vw"
           className={cn(
-            "object-cover object-center",
-            isVideoLoaded ? "opacity-0 pointer-events-none" : "opacity-100"
+            "object-cover object-center transition-opacity duration-500",
+            isVideoReady ? "opacity-0 pointer-events-none" : "opacity-100",
           )}
         />
 
-        {/* Scroll-Locked Video with Continuous Scrubbing (Hardware-accelerated) */}
         <video
           ref={videoRef}
           src={videoSrc}
           muted
           playsInline
-          loop={false}
           preload="auto"
+          disablePictureInPicture
           style={{
             transform: "scale3d(1, 1, 1)",
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
           }}
           className={cn(
-            "absolute inset-0 w-full h-full object-cover object-center will-change-transform",
-            isVideoLoaded ? "opacity-100" : "opacity-0"
+            "absolute inset-0 h-full w-full object-cover object-center will-change-transform",
+            isVideoReady ? "opacity-100" : "opacity-0",
           )}
         />
 
-        {/* Cinematic Luxury Overlays */}
         <div
-          className="absolute inset-0 bg-gradient-to-t from-[#161513]/95 via-[#161513]/50 to-[#161513]/75 pointer-events-none"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#161513]/95 via-[#161513]/55 to-[#161513]/80"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[500px] lg:w-[700px] h-[300px] sm:h-[400px] lg:h-[500px] bg-[#b99a68]/15 rounded-full blur-[100px] sm:blur-[140px]"
+          className="pointer-events-none absolute top-1/3 left-1/2 h-[260px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#b99a68]/15 blur-[90px] sm:h-[400px] sm:w-[500px] sm:blur-[140px] lg:h-[500px] lg:w-[700px]"
           aria-hidden="true"
         />
 
-        {/* 1. Initial State: Headline, Copy & CTAs */}
+        {/* Intro */}
         <div
           ref={introContentRef}
-          className="relative z-20 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-8 md:pt-0 pb-16 sm:pb-12 text-center flex flex-col items-center justify-center will-change-transform"
+          className="relative z-20 mx-auto flex w-full max-w-[1280px] flex-col items-center justify-center px-4 pb-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] pt-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] text-center will-change-transform sm:px-6 sm:pb-14 sm:pt-16 lg:px-8 lg:pt-8"
         >
-          {/* Eyebrow Pill */}
-          <div className="inline-flex items-center gap-2 sm:gap-2.5 rounded-full border border-[#d8c7ad]/30 bg-black/45 px-3 py-1 sm:px-4 sm:py-1.5 backdrop-blur-md mb-3 sm:mb-5 md:mb-6 shadow-md">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d8c7ad]/30 bg-black/45 px-3 py-1 shadow-md backdrop-blur-md sm:mb-5 sm:gap-2.5 sm:px-4 sm:py-1.5">
             <div className="relative h-3.5 w-3.5 sm:h-4 sm:w-4">
               <Image
                 src="/logo/renil-crest-v2.png"
@@ -249,29 +324,26 @@ export function ScrollLockedVideoHero({
                 className="object-contain brightness-125"
               />
             </div>
-            <span className="text-[9px] sm:text-[11px] uppercase tracking-[0.18em] sm:tracking-[0.22em] font-semibold text-[#d8c7ad]">
+            <span className="text-[8px] font-semibold uppercase tracking-[0.16em] text-[#d8c7ad] sm:text-[11px] sm:tracking-[0.22em]">
               {eyebrow}
             </span>
           </div>
 
-          {/* Headline */}
-          <h1 className="heading-display text-[#fffdf9] max-w-5xl mb-3 sm:mb-5 md:mb-6 drop-shadow-md">
+          <h1 className="heading-display mb-3 max-w-5xl text-[clamp(1.85rem,7.2vw,5.5rem)] text-[#fffdf9] drop-shadow-md sm:mb-5 md:mb-6">
             {title}
           </h1>
 
-          {/* Subtitle */}
-          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-[#d8c7ad]/90 max-w-md sm:max-w-xl md:max-w-2xl font-light leading-relaxed mb-6 sm:mb-8 md:mb-10 drop-shadow">
+          <p className="mb-5 max-w-[20rem] text-[13px] font-light leading-relaxed text-[#d8c7ad]/90 drop-shadow sm:mb-8 sm:max-w-xl sm:text-base md:mb-10 md:max-w-2xl md:text-lg lg:text-xl">
             {subtitle}
           </p>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-4 md:gap-5 w-full sm:w-auto px-4 sm:px-0">
+          <div className="flex w-full max-w-sm flex-col items-stretch gap-2.5 px-1 sm:max-w-none sm:w-auto sm:flex-row sm:items-center sm:gap-4 sm:px-0 md:gap-5">
             <ShimmerButton
               href={primaryCtaHref}
               variant="primary"
               size="md"
               showArrow
-              className="w-full sm:w-auto shadow-xl py-3 sm:py-3.5 text-xs sm:text-sm"
+              className="w-full py-3 text-xs shadow-xl sm:w-auto sm:py-3.5 sm:text-sm"
             >
               {primaryCtaText}
             </ShimmerButton>
@@ -280,39 +352,40 @@ export function ScrollLockedVideoHero({
               href={secondaryCtaHref}
               variant="outlineInverse"
               size="md"
-              className="w-full sm:w-auto py-3 sm:py-3.5 text-xs sm:text-sm"
+              className="w-full py-3 text-xs sm:w-auto sm:py-3.5 sm:text-sm"
             >
               {secondaryCtaText}
             </ShimmerButton>
           </div>
         </div>
 
-        {/* 2. Revealed Climax State: Sleek Executive Floating Dock */}
+        {/* Revealed dock */}
         <div
           ref={revealedContentRef}
           style={{ opacity: 0 }}
-          className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center justify-end px-3 sm:px-6 lg:px-8 pb-3 sm:pb-5 lg:pb-6 text-center will-change-transform pointer-events-none"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center justify-end px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center will-change-transform sm:px-6 sm:pb-5 lg:px-8 lg:pb-6"
         >
-          <div className="w-full max-w-4xl bg-[#161513]/90 sm:bg-[#161513]/85 backdrop-blur-2xl border border-[#d8c7ad]/30 rounded-2xl sm:rounded-full px-4 py-3 sm:px-7 sm:py-3.5 shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 pointer-events-auto">
-            {/* Left: Tagline & Group Vision */}
-            <div className="flex flex-col md:items-start items-center text-center md:text-left">
-              <div className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] uppercase tracking-[0.25em] font-bold text-[#b99a68] mb-0.5">
+          <div className="pointer-events-auto flex w-full max-w-4xl flex-col items-center justify-between gap-3 rounded-2xl border border-[#d8c7ad]/30 bg-[#161513]/92 px-3.5 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl sm:flex-row sm:gap-4 sm:rounded-full sm:bg-[#161513]/85 sm:px-7 sm:py-3.5">
+            <div className="flex flex-col items-center text-center md:items-start md:text-left">
+              <div className="mb-0.5 inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-[#b99a68] sm:text-[10px] sm:tracking-[0.25em]">
                 <Sparkles className="h-3 w-3 text-[#b99a68]" />
                 <span>THE RENIL ECOSYSTEM</span>
               </div>
-              <p className="font-serif text-sm sm:text-base md:text-lg text-[#fffdf9] tracking-tight">
-                One Vision. <span className="italic text-[#d8c7ad] font-normal">Multiple Avenues For Growth.</span>
+              <p className="font-serif text-[13px] tracking-tight text-[#fffdf9] sm:text-base md:text-lg">
+                One Vision.{" "}
+                <span className="font-normal italic text-[#d8c7ad]">
+                  Multiple Avenues For Growth.
+                </span>
               </p>
             </div>
 
-            {/* Right: CTA Actions */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center">
+            <div className="flex w-full flex-col items-stretch justify-center gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
               <ShimmerButton
                 href="/submit-your-business"
                 variant="primary"
                 size="sm"
                 showArrow
-                className="w-full sm:w-auto sm:flex-initial py-2.5 px-4 sm:px-5 text-xs font-medium shadow-md"
+                className="w-full px-4 py-2.5 text-xs font-medium shadow-md sm:w-auto sm:flex-initial sm:px-5"
               >
                 Present Your Business
               </ShimmerButton>
@@ -320,7 +393,7 @@ export function ScrollLockedVideoHero({
                 href="/businesses"
                 variant="outlineInverse"
                 size="sm"
-                className="w-full sm:w-auto sm:flex-initial py-2.5 px-4 sm:px-5 text-xs font-medium"
+                className="w-full px-4 py-2.5 text-xs font-medium sm:w-auto sm:flex-initial sm:px-5"
               >
                 Explore Verticals
               </ShimmerButton>
@@ -328,22 +401,21 @@ export function ScrollLockedVideoHero({
           </div>
         </div>
 
-        {/* Scroll Indicator at Bottom */}
+        {/* Scroll hint */}
         <div
           ref={scrollHintRef}
-          className="absolute left-1/2 bottom-4 sm:bottom-7 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 sm:gap-2 text-[#d8c7ad]/70 pointer-events-none transition-opacity duration-300"
+          className="pointer-events-none absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[#d8c7ad]/70 transition-opacity duration-300 sm:bottom-7 sm:gap-2"
         >
-          <span className="text-[8px] sm:text-[10px] uppercase tracking-[0.25em] sm:tracking-[0.3em] font-semibold">
+          <span className="text-[8px] font-semibold uppercase tracking-[0.25em] sm:text-[10px] sm:tracking-[0.3em]">
             {scrollHint}
           </span>
-          <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-bounce text-[#b99a68]" />
+          <ChevronDown className="h-3.5 w-3.5 animate-bounce text-[#b99a68] sm:h-4 sm:w-4" />
         </div>
 
-        {/* Bottom Scrub Progress Line (21st.dev signature element) */}
-        <div className="absolute left-0 right-0 bottom-0 h-[2.5px] sm:h-[3px] bg-white/10 z-30">
+        <div className="absolute right-0 bottom-0 left-0 z-30 h-[2.5px] bg-white/10 sm:h-[3px]">
           <div
             ref={progressBarRef}
-            className="h-full w-full bg-gradient-to-r from-[#a98345] via-[#d8c7ad] to-[#b99a68] origin-left will-change-transform"
+            className="h-full w-full origin-left bg-gradient-to-r from-[#a98345] via-[#d8c7ad] to-[#b99a68] will-change-transform"
             style={{ transform: "scaleX(0)" }}
           />
         </div>

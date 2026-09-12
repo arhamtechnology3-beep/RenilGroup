@@ -6,10 +6,26 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-09-12] — Bundui Scroll Progress Bar (21st.dev)
+- Installed Bundui Scroll Progress Bar (`components/ui/scroll-progress-bar.tsx`) from [21st.dev](https://21st.dev/@bundui/components/scroll-progress-bar).
+- Mounted site-wide as a gold top bar (`type="bar"`, `#a98345`) in root layout; uses existing `framer-motion`.
+
+### [2026-09-12] — Disable Right-Click
+- Site-wide context menu disabled via `DisableContextMenu` in root layout.
+- Hardened: capture-phase listeners on `window`/`document`/`html`/`body`, plus an inline `<head>` script so the block runs before React hydrates.
+
+### [2026-09-12] — Mobile Hero Scroll Reliability + Responsive
+- Fixed intermittent scroll-scrub: stable `100svh` sticky height (avoids mobile URL-bar `dvh` jumps), scroll range from sticky pane, visualViewport resize listeners.
+- Hardened video ready/seek path (`loadedmetadata`/`durationchange`/`canplay`, pending seek queue, mobile-throttled seeks).
+- Mobile layout: safe-area padding, tighter type/CTA stack, shorter scrub track on small phones, compact climax dock.
+- Body `overflow-x: hidden` → `clip` so Safari sticky hero is not broken by a scrollport ancestor.
+
 ### [2026-09-12] — Open Graph Banner Update
 - Added share image `public/images/og-renil-groups.jpg` (1200×630) from the Renil Groups promo banner.
 - Updated default OG/Twitter title, description, image, and `siteUrl` to `https://renilgroup.arhamtechnology.com`.
 - Synced Organization JSON-LD URL/logo/image with the live domain.
+- Shortened `og:description` for social preview limits (~125 chars).
+- OpenGraph.xyz scan of the live host still showed the **previous** deploy (`og:image` → renilgroups.com fetch failed) until Hostinger redeploys.
 
 ### [2026-09-12] — Hostinger Build Fix (SWC / glibc)
 - Replaced `next.config.ts` with `next.config.mjs` so config does not need native SWC (Hostinger lacks GLIBC_2.29).
