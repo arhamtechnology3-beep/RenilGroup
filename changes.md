@@ -6,6 +6,11 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-09-12] — Hostinger Build Fix (SWC / glibc)
+- Replaced `next.config.ts` with `next.config.mjs` so config does not need native SWC (Hostinger lacks GLIBC_2.29).
+- Build script uses `next build --webpack` (falls back to SWC wasm when native binary cannot load).
+- Set `outputFileTracingRoot` / `turbopack.root` to the project cwd; `engines.node` `>=20 <23`.
+
 ### [2026-09-08] — Favicon / Brand Icon Update
 - Replaced default Next.js favicon with Renil crest on charcoal (`app/favicon.ico`, `app/icon.png`, `app/apple-icon.png`).
 - Added public `favicon-32.png` + `apple-touch-icon.png`; wired icons in root layout metadata.
