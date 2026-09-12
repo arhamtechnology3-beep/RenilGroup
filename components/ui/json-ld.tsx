@@ -28,7 +28,7 @@ export const organizationJsonLd = {
   },
   slogan: "Building businesses. Creating value.",
   description:
-    "At Renil Groups, we invest, develop, create and connect across multiple avenues to build a better tomorrow — spanning Ventures, Developments, Hospitality, and Logistics.",
+    "We invest, develop, create and connect across Ventures, Developments, Hospitality, and Logistics — building a better tomorrow.",
   department: [
     {
       "@type": "Organization",

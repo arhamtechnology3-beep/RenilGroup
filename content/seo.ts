@@ -5,7 +5,7 @@ export const defaultSeo = {
   titleTemplate: "%s | Renil Groups",
   defaultTitle: "Renil Groups | Diverse Businesses. A Brighter Tomorrow.",
   defaultDescription:
-    "At Renil Groups, we invest, develop, create and connect across multiple avenues to build a better tomorrow — spanning Ventures, Developments, Hospitality, and Logistics.",
+    "We invest, develop, create and connect across Ventures, Developments, Hospitality, and Logistics — building a better tomorrow.",
   siteUrl: "https://renilgroup.arhamtechnology.com",
   ogImage: "/images/og-renil-groups.jpg",
   ogImageAlt:
