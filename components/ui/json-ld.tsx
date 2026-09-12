@@ -18,8 +18,9 @@ export const organizationJsonLd = {
   "@type": "Organization",
   name: "Renil Groups",
   legalName: "Renil Groups Pvt. Ltd.",
-  url: "https://renilgroups.com",
-  logo: "https://renilgroups.com/logo/renil-crest-v2.png",
+  url: "https://renilgroup.arhamtechnology.com",
+  logo: "https://renilgroup.arhamtechnology.com/logo/renil-crest-v2.png",
+  image: "https://renilgroup.arhamtechnology.com/images/og-renil-groups.jpg",
   founder: {
     "@type": "Person",
     name: "Swapnil Shinde",
@@ -27,7 +28,7 @@ export const organizationJsonLd = {
   },
   slogan: "Building businesses. Creating value.",
   description:
-    "A diversified corporate ecosystem bringing together investment opportunities, real estate development, hospitality, and logistics under one entrepreneurial vision.",
+    "At Renil Groups, we invest, develop, create and connect across multiple avenues to build a better tomorrow — spanning Ventures, Developments, Hospitality, and Logistics.",
   department: [
     {
       "@type": "Organization",

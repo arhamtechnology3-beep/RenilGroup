@@ -3,10 +3,13 @@ import { Metadata } from "next";
 export const defaultSeo = {
   siteName: "Renil Groups",
   titleTemplate: "%s | Renil Groups",
-  defaultTitle: "Renil Groups | Building Businesses. Creating Value.",
+  defaultTitle: "Renil Groups | Diverse Businesses. A Brighter Tomorrow.",
   defaultDescription:
-    "A growing corporate business group with an entrepreneurial mindset — bringing together ventures, developments, hospitality and logistics under one vision.",
-  siteUrl: "https://renilgroups.com",
+    "At Renil Groups, we invest, develop, create and connect across multiple avenues to build a better tomorrow — spanning Ventures, Developments, Hospitality, and Logistics.",
+  siteUrl: "https://renilgroup.arhamtechnology.com",
+  ogImage: "/images/og-renil-groups.jpg",
+  ogImageAlt:
+    "Renil Groups — Diverse Businesses. A Brighter Tomorrow. Building businesses. Creating value.",
   keywords: [
     "Renil Groups",
     "Renil Ventures",
@@ -24,7 +27,7 @@ export function constructMetadata({
   title,
   description,
   canonical,
-  ogImage = "/images/office-brand-wall.jpg",
+  ogImage = defaultSeo.ogImage,
 }: {
   title: string;
   description: string;
@@ -58,7 +61,7 @@ export function constructMetadata({
           url: ogImage,
           width: 1200,
           height: 630,
-          alt: "Renil Groups — Building businesses. Creating value.",
+          alt: defaultSeo.ogImageAlt,
         },
       ],
       locale: "en_US",

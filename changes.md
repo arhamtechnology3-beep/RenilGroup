@@ -6,6 +6,11 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-09-12] — Open Graph Banner Update
+- Added share image `public/images/og-renil-groups.jpg` (1200×630) from the Renil Groups promo banner.
+- Updated default OG/Twitter title, description, image, and `siteUrl` to `https://renilgroup.arhamtechnology.com`.
+- Synced Organization JSON-LD URL/logo/image with the live domain.
+
 ### [2026-09-12] — Hostinger Build Fix (SWC / glibc)
 - Replaced `next.config.ts` with `next.config.mjs` so config does not need native SWC (Hostinger lacks GLIBC_2.29).
 - Build script uses `next build --webpack` (falls back to SWC wasm when native binary cannot load).

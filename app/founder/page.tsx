@@ -29,7 +29,7 @@ export default function FounderPage() {
       "@type": "Organization",
       name: "Renil Groups",
     },
-    image: "https://renilgroups.com/images/founder.jpeg",
+    image: "https://renilgroup.arhamtechnology.com/images/founder.jpeg",
     description:
       "Founder and Chief Executive Officer of Renil Groups, guiding the group's vision across ventures, developments, hospitality, and logistics.",
   };

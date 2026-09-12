@@ -46,10 +46,10 @@ export const metadata: Metadata = {
     siteName: defaultSeo.siteName,
     images: [
       {
-        url: "/images/office-brand-wall.jpg",
+        url: defaultSeo.ogImage,
         width: 1200,
         height: 630,
-        alt: "Renil Groups — Building businesses. Creating value.",
+        alt: defaultSeo.ogImageAlt,
       },
     ],
     locale: "en_US",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: defaultSeo.defaultTitle,
     description: defaultSeo.defaultDescription,
-    images: ["/images/office-brand-wall.jpg"],
+    images: [defaultSeo.ogImage],
   },
 };
 
