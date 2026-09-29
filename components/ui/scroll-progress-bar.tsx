@@ -1,12 +1,6 @@
 "use client";
 
 import React from "react";
-import {
-  motion,
-  useMotionValueEvent,
-  useScroll,
-  useTransform,
-} from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface ScrollProgressBarProps {
@@ -19,8 +13,8 @@ interface ScrollProgressBarProps {
 }
 
 /**
- * Bundui / 21st.dev Scroll Progress Bar
- * https://21st.dev/@bundui/components/scroll-progress-bar
+ * Site-wide scroll progress. Uses native scroll metrics (not Framer useScroll)
+ * so the home sticky video hero still advances the bar from the top of the page.
  */
 export default function ScrollProgressBar({
   type = "circle",
@@ -30,13 +24,60 @@ export default function ScrollProgressBar({
   showPercentage = false,
   className,
 }: ScrollProgressBarProps) {
-  const { scrollYProgress } = useScroll();
-  const scrollPercentage = useTransform(scrollYProgress, [0, 1], [0, 100]);
+  const barFillRef = React.useRef<HTMLSpanElement>(null);
+  const circleRef = React.useRef<SVGCircleElement>(null);
   const [percentage, setPercentage] = React.useState(0);
 
-  useMotionValueEvent(scrollPercentage, "change", (latest) => {
-    setPercentage(Math.round(latest));
-  });
+  React.useEffect(() => {
+    let raf = 0;
+
+    const readProgress = () => {
+      const scrollTop =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+      const max =
+        document.documentElement.scrollHeight - window.innerHeight;
+      return max > 0 ? Math.min(1, Math.max(0, scrollTop / max)) : 0;
+    };
+
+    const apply = () => {
+      raf = 0;
+      const p = readProgress();
+      const pct = Math.round(p * 100);
+
+      if (barFillRef.current) {
+        barFillRef.current.style.transform = `scaleX(${p})`;
+      }
+      if (circleRef.current) {
+        // r=30 → circumference ≈ 188.5
+        const c = 2 * Math.PI * 30;
+        circleRef.current.style.strokeDasharray = `${c}`;
+        circleRef.current.style.strokeDashoffset = `${c * (1 - p)}`;
+      }
+      setPercentage((prev) => (prev === pct ? prev : pct));
+    };
+
+    const onScrollOrResize = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(apply);
+    };
+
+    apply();
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
+    // Home hero / images can change document height after paint
+    const ro = new ResizeObserver(onScrollOrResize);
+    ro.observe(document.documentElement);
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+      ro.disconnect();
+    };
+  }, [type]);
 
   if (type === "bar") {
     return (
@@ -49,10 +90,11 @@ export default function ScrollProgressBar({
         aria-hidden="true"
       >
         <span
-          className="block h-full w-full"
+          ref={barFillRef}
+          className="block h-full w-full origin-left will-change-transform"
           style={{
             backgroundColor: color,
-            width: `${percentage}%`,
+            transform: "scaleX(0)",
           }}
         />
       </div>
@@ -84,16 +126,15 @@ export default function ScrollProgressBar({
               stroke="rgba(169,131,69,0.25)"
               strokeWidth={strokeSize}
             />
-            <motion.circle
+            <circle
+              ref={circleRef}
               cx="50"
               cy="50"
               r="30"
-              pathLength="1"
-              stroke={color}
               fill="none"
-              strokeDashoffset="0"
+              stroke={color}
               strokeWidth={strokeSize}
-              style={{ pathLength: scrollYProgress }}
+              transform="rotate(-90 50 50)"
             />
           </svg>
           {showPercentage ? (

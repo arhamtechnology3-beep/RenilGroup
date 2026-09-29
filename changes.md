@@ -6,9 +6,15 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-09-29] — Maintenance Mode ON
+- Added root `proxy.ts` (Next 16 replacement for middleware) that serves a standalone branded "We'll be back shortly" page for every route.
+- Responds with HTTP `503` + `Retry-After` + `noindex` so search engines treat the downtime as temporary.
+- Static files (logo, favicon, `_next` assets) still load. Toggle via `MAINTENANCE_MODE` in `proxy.ts` (set to `false` and redeploy to go live again).
+
 ### [2026-09-12] — Bundui Scroll Progress Bar (21st.dev)
 - Installed Bundui Scroll Progress Bar (`components/ui/scroll-progress-bar.tsx`) from [21st.dev](https://21st.dev/@bundui/components/scroll-progress-bar).
-- Mounted site-wide as a gold top bar (`type="bar"`, `#a98345`) in root layout; uses existing `framer-motion`.
+- Mounted site-wide as a gold top bar (`type="bar"`, `#a98345`) in root layout.
+- Home fix: dropped Framer `useScroll` for native `scrollY` / `scrollHeight` tracking so the bar advances through the sticky video hero (not only from section two onward).
 
 ### [2026-09-12] — Disable Right-Click
 - Site-wide context menu disabled via `DisableContextMenu` in root layout.
