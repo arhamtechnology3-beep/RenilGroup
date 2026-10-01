@@ -6,6 +6,9 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-10-01] — Maintenance Mode OFF
+- Set `MAINTENANCE_MODE = false` in `proxy.ts`; the full site is live again. Flip back to `true` and redeploy to re-enable.
+
 ### [2026-09-29] — Maintenance Mode ON
 - Added root `proxy.ts` (Next 16 replacement for middleware) that serves a standalone branded "We'll be back shortly" page for every route.
 - Responds with HTTP `503` + `Retry-After` + `noindex` so search engines treat the downtime as temporary.
