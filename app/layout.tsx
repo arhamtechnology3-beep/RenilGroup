@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -11,17 +11,18 @@ import ScrollProgressBar from "@/components/ui/scroll-progress-bar";
 import { JsonLd, organizationJsonLd } from "@/components/ui/json-ld";
 import { defaultSeo } from "@/content/seo";
 
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
+// Self-hosted so builds never fetch Google Fonts (Hostinger fetches fail intermittently).
+const cormorant = localFont({
+  src: "./fonts/cormorant-garamond-latin.woff2",
   variable: "--font-cormorant",
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
   display: "swap",
 });
 
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+const jakarta = localFont({
+  src: "./fonts/plus-jakarta-sans-latin.woff2",
   variable: "--font-jakarta",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: "300 700",
   display: "swap",
 });
 
