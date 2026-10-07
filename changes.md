@@ -6,6 +6,9 @@ All updates, enhancements, architectural changes, and asset optimizations for th
 
 ## Change History
 
+### [2026-10-07] — Maintenance Mode ON
+- Set `MAINTENANCE_MODE = true` in `proxy.ts`; every page serves the branded 503 maintenance screen again. Set to `false` and redeploy to go live.
+
 ### [2026-10-01] — Maintenance Mode OFF
 - Set `MAINTENANCE_MODE = false` in `proxy.ts`; the full site is live again. Flip back to `true` and redeploy to re-enable.
 

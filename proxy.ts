@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 /** Set to `false` and redeploy to bring the site back online. */
-const MAINTENANCE_MODE = false;
+const MAINTENANCE_MODE = true;
 
 const MAINTENANCE_HTML = `<!doctype html>
 <html lang="en">
